@@ -1,0 +1,1 @@
+An Android app which provides recipes for baking. App provides small descriptive videos to assist recipe steps. Also, there is an app widget to see particular recipe ingredients.
