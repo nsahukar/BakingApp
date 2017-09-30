@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Loader Ids -->
+    <integer name="id_recipes_loader">101</integer>
+    <integer name="id_recipe_steps_loader">102</integer>
+
+    <integer name="grid_span_count">1</integer>
+</resources>

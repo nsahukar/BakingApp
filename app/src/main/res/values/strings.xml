@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">BakingApp</string>
+
+    <!-- Recipes Activity -->
+    <string name="btn_retry_title">Retry</string>
+    <string name="content_desc_recipe_image">Recipe Image</string>
+    <string name="transition_recipe">Recipe Transition</string>
+
+    <!-- Recipe Step Activity -->
+    <string name="title_ingredients">Ingredients</string>
+    <string name="title_header_ingredients">INGREDIENTS</string>
+    <string name="title_steps">Steps</string>
+    <string name="title_header_steps">STEPS</string>
+    <string name="title_header_no_video">NO VIDEO</string>
+
+    <!-- Recipe Details Activity -->
+    <string name="title_introduction">Introduction</string>
+    <string name="title_previous">Previous</string>
+    <string name="title_next">Next</string>
+    <string name="appwidget_text">EXAMPLE</string>
+    <string name="configure">Configure</string>
+    <string name="add_widget">Add widget</string>
+
+    <!-- Ingredients App Widget -->
+    <string name="title_ingredients_app_widget_config_activity">Select Recipe</string>
+</resources>

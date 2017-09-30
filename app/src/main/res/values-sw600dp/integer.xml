@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="grid_span_count">2</integer>
+    <integer name="request_code_show_recipe_details_portrait">101</integer>
+    <integer name="result_code_show_recipe_details_landscape">201</integer>
+</resources>

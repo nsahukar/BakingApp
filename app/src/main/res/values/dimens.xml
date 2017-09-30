@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="default_layout_padding">16dp</dimen>
+
+    <dimen name="progress_bar_width">42dp</dimen>
+    <dimen name="progress_bar_height">@dimen/progress_bar_width</dimen>
+
+    <dimen name="grid_padding_left">0dp</dimen>
+    <dimen name="grid_padding_right">@dimen/grid_padding_left</dimen>
+    <dimen name="grid_item_offset">8dp</dimen>
+
+    <dimen name="simple_exo_player_view_height_portrait">320dp</dimen>
+
+    <!--
+Refer to App Widget Documentation for margin information
+http://developer.android.com/guide/topics/appwidgets/index.html#CreatingLayout
+    -->
+    <dimen name="widget_margin">8dp</dimen>
+</resources>
