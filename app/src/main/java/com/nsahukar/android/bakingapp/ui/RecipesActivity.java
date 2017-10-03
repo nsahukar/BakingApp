@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.Parcelable;
+import android.os.PersistableBundle;
 import android.support.annotation.DimenRes;
 import android.support.annotation.NonNull;
 import android.support.constraint.ConstraintLayout;
@@ -32,11 +34,14 @@ import butterknife.OnClick;
 public class RecipesActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>,
         RecipesAdapter.OnItemClickListener {
 
+    private static final String STATE_RECYCLER_VIEW = "state_recycler_view";
+
     @BindView(R.id.toolbar) Toolbar mToolbar;
     @BindView(R.id.progress_bar) ProgressBar mProgressBar;
     @BindView(R.id.layout_error) ConstraintLayout mErrorLayout;
     @BindView(R.id.tv_error_msg) TextView mErrorMessageTextView;
     @BindView(R.id.rv_recipes) RecyclerView mRecipesRecyclerView;
+    private Parcelable mRecyclerViewSavedInstanceSate;
     private RecipesAdapter mRecipesAdapter;
 
     // Item decoration for the grid
@@ -73,6 +78,10 @@ public class RecipesActivity extends AppCompatActivity implements LoaderManager.
         // set adapter to recycler view
         mRecipesAdapter = new RecipesAdapter(this, RecipesAdapter.VIEW_TYPE_GRID);
         mRecipesRecyclerView.setAdapter(mRecipesAdapter);
+        if (mRecyclerViewSavedInstanceSate != null) {
+            mRecipesRecyclerView.getLayoutManager().
+                    onRestoreInstanceState(mRecyclerViewSavedInstanceSate);
+        }
     }
 
     // Show loader indicator
@@ -109,10 +118,23 @@ public class RecipesActivity extends AppCompatActivity implements LoaderManager.
             setSupportActionBar(mToolbar);
             mToolbar.setTitle(getTitle());
         }
+        if (savedInstanceState != null) {
+            if (savedInstanceState.containsKey(STATE_RECYCLER_VIEW)) {
+                mRecyclerViewSavedInstanceSate = savedInstanceState.
+                        getParcelable(STATE_RECYCLER_VIEW);
+            }
+        }
         setUpRecyclerView();
         showLoaderIndicator();
         getSupportLoaderManager().initLoader(R.integer.id_recipes_loader, null, this);
         BakingAppSyncUtils.initialize(this);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelable(STATE_RECYCLER_VIEW, mRecipesRecyclerView.getLayoutManager().
+                onSaveInstanceState());
     }
 
     @OnClick(R.id.btn_retry)

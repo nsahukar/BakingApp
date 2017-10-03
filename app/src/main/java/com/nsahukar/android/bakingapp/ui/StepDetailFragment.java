@@ -7,14 +7,15 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
@@ -42,6 +43,7 @@ import com.google.android.exoplayer2.upstream.cache.SimpleCache;
 import com.google.android.exoplayer2.util.Util;
 import com.nsahukar.android.bakingapp.R;
 import com.nsahukar.android.bakingapp.data.Step;
+import com.squareup.picasso.Picasso;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -50,59 +52,100 @@ import butterknife.ButterKnife;
 public class StepDetailFragment extends Fragment implements ExoPlayer.EventListener {
 
     private static final String TAG = StepDetailFragment.class.getSimpleName();
-    private static final String ARG_STEP_CONTENT_VALUES = "step_values";
-    private static final String ARG_FINAL_STEP = "final_step";
+    private static final String ARG_STEP_CONTENT_VALUES = "arg_step_values";
+    private static final String ARG_FINAL_STEP = "arg_final_step";
+    private static final String STATE_RESUME_WINDOW = "state_resume_window";
+    private static final String STATE_RESUME_POSITION = "state_resume_position";
     private static final long CACHE_MAX_SIZE = 1024 * 1024 * 100;
 
     private ContentValues mStepContentValues;
+    private Uri mRecipeStepVideoUri;
+    private String mRecipeStepVideoThumbnailUrl;
     private SimpleExoPlayer mPlayer;
+    private int mResumeWindow;
+    private long mResumePosition;
     private OnFragmentInteractionListener mListener;
     private boolean mFinalStep;
     @BindView(R.id.tv_no_video) TextView mNoVideoTextView;
     @BindView(R.id.sepv_recipe_step) SimpleExoPlayerView mPlayerView;
-    @BindView(R.id.tv_recipe_step_number) TextView mRecipeStepNumberTextView;
-    @BindView(R.id.tv_recipe_step) TextView mRecipeStepTextView;
+    @Nullable @BindView(R.id.tv_recipe_step_number) TextView mRecipeStepNumberTextView;
+    @Nullable @BindView(R.id.tv_recipe_step) TextView mRecipeStepTextView;
     @Nullable @BindView(R.id.btn_previous) Button mPreviousButton;
     @Nullable @BindView(R.id.btn_next) Button mNextButton;
 
 
     // initialize exo player for the recipe step
-    private void initializePlayer(Uri videoUri) {
-        // initialize player and player view
-        BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
-        TrackSelection.Factory videoTrackSelectionFactory =
-                new AdaptiveTrackSelection.Factory(bandwidthMeter);
-        TrackSelector trackSelector =
-                new DefaultTrackSelector(videoTrackSelectionFactory);
-        mPlayer = ExoPlayerFactory.newSimpleInstance(getActivity(), trackSelector);
-        mPlayerView.setPlayer(mPlayer);
+    private void initializePlayer() {
+        if (mRecipeStepVideoUri != null) {
+            // initialize player and player view
+            BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+            TrackSelection.Factory videoTrackSelectionFactory =
+                    new AdaptiveTrackSelection.Factory(bandwidthMeter);
+            TrackSelector trackSelector =
+                    new DefaultTrackSelector(videoTrackSelectionFactory);
+            mPlayer = ExoPlayerFactory.newSimpleInstance(getActivity(), trackSelector);
+            mPlayerView.setPlayer(mPlayer);
 
-        // set event listener for the player as this activity
-        mPlayer.addListener(this);
-
-        // set click listener for replay button
-        ImageButton replayButton = (ImageButton) mPlayerView.findViewById(R.id.exo_replay);
-        replayButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                mPlayer.seekToDefaultPosition();
-                mPlayer.setPlayWhenReady(true);
-                showPlayPause();
+            // set video thumbnail (if present)
+            if (mRecipeStepVideoThumbnailUrl != null && mRecipeStepVideoThumbnailUrl.length() > 0) {
+                ImageView videoThumbnailImageView = mPlayerView.findViewById(R.id.exo_artwork);
+                Picasso.with(getActivity()).load(mRecipeStepVideoThumbnailUrl).
+                        into(videoThumbnailImageView);
             }
-        });
 
-        // set up media source
-        String userAgent = Util.getUserAgent(getActivity(), getString(R.string.app_name));
-        HttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(userAgent);
-        Cache cache = new SimpleCache(getActivity().getCacheDir(),
-                new LeastRecentlyUsedCacheEvictor(CACHE_MAX_SIZE));
-        CacheDataSourceFactory cacheDataSourceFactory = new CacheDataSourceFactory(cache, httpDataSourceFactory);
-        DefaultExtractorsFactory defaultExtractorsFactory = new DefaultExtractorsFactory();
-        MediaSource mediaSource = new ExtractorMediaSource(videoUri, cacheDataSourceFactory,
-                defaultExtractorsFactory, null, null);
+            // set event listener for the player as this activity
+            mPlayer.addListener(this);
 
-        // prepare the media source and set it to play when ready
-        mPlayer.prepare(mediaSource);
+            // set click listener for replay button
+            ImageButton replayButton = mPlayerView.findViewById(R.id.exo_replay);
+            replayButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    mPlayer.seekToDefaultPosition();
+                    mPlayer.setPlayWhenReady(true);
+                    showPlayPause();
+                }
+            });
+
+            // set up media source
+            String userAgent = Util.getUserAgent(getActivity(), getString(R.string.app_name));
+            HttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(userAgent);
+            Cache cache = new SimpleCache(getActivity().getCacheDir(),
+                    new LeastRecentlyUsedCacheEvictor(CACHE_MAX_SIZE));
+            CacheDataSourceFactory cacheDataSourceFactory = new CacheDataSourceFactory(cache, httpDataSourceFactory);
+            DefaultExtractorsFactory defaultExtractorsFactory = new DefaultExtractorsFactory();
+            MediaSource mediaSource = new ExtractorMediaSource(mRecipeStepVideoUri, cacheDataSourceFactory,
+                    defaultExtractorsFactory, null, null);
+
+            // prepare the media source and set it to play when ready
+            boolean haveResumePosition = mResumeWindow != C.INDEX_UNSET;
+            if (haveResumePosition) {
+                mPlayer.seekTo(mResumeWindow, mResumePosition);
+            }
+            mPlayer.prepare(mediaSource, !haveResumePosition, false);
+        } else {
+            mNoVideoTextView.setVisibility(TextView.VISIBLE);
+        }
+    }
+
+    private void releasePlayer() {
+        if (mPlayer != null) {
+            mPlayer.stop();
+            mPlayer.release();
+            mPlayer = null;
+        }
+    }
+
+    private void updateResumePosition() {
+        if (mPlayer != null) {
+            mResumeWindow = mPlayer.getCurrentWindowIndex();
+            mResumePosition = Math.max(0, mPlayer.getCurrentPosition());
+        }
+    }
+
+    private void clearResumePosition() {
+        mResumeWindow = C.INDEX_UNSET;
+        mResumePosition = C.TIME_UNSET;
     }
 
     // hide play/pause button of exo-player
@@ -140,6 +183,14 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
 
     // lifecycle methods
     @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        if (context instanceof StepDetailFragment.OnFragmentInteractionListener) {
+            mListener = (StepDetailFragment.OnFragmentInteractionListener) context;
+        }
+    }
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
@@ -156,21 +207,24 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
         ButterKnife.bind(this, view);
 
         Step step = new Step(mStepContentValues);
-
-        // initialize player
+        // recipe step video url
         final String videoUrlString = step.getVideoUrl();
         if (videoUrlString != null && videoUrlString.length() > 0) {
-            Uri videoUri = Uri.parse(videoUrlString);
-            initializePlayer(videoUri);
-        } else {
-            mNoVideoTextView.setVisibility(TextView.VISIBLE);
+            mRecipeStepVideoUri = Uri.parse(videoUrlString);
         }
 
+        // recipe step video thumbnail url
+        mRecipeStepVideoThumbnailUrl = step.getThumbnailUrl();
+
         // set recipe step number text view
-        mRecipeStepNumberTextView.setText(step.getFriendlyId());
+        if (mRecipeStepNumberTextView != null) {
+            mRecipeStepNumberTextView.setText(step.getFriendlyId());
+        }
 
         // set recipe step text view
-        mRecipeStepTextView.setText(step.getFriendlyDescription());
+        if (mRecipeStepTextView != null) {
+            mRecipeStepTextView.setText(step.getFriendlyDescription());
+        }
 
         // For width < 900dp
         // set click listeners for next and previous buttons
@@ -209,24 +263,58 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
     }
 
     @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        if (context instanceof StepDetailFragment.OnFragmentInteractionListener) {
-            mListener = (StepDetailFragment.OnFragmentInteractionListener) context;
+    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        clearResumePosition();
+        if (savedInstanceState != null) {
+            if (savedInstanceState.containsKey(STATE_RESUME_WINDOW)) {
+                mResumeWindow = savedInstanceState.getInt(STATE_RESUME_WINDOW);
+            }
+            if (savedInstanceState.containsKey(STATE_RESUME_POSITION)) {
+                mResumePosition = savedInstanceState.getLong(STATE_RESUME_POSITION);
+            }
         }
     }
 
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-        mPlayerView = null;
-        if (mPlayer != null) {
-            mPlayer.stop();
-            mPlayer.release();
-            mPlayer = null;
+    public void onStart() {
+        super.onStart();
+        if (Util.SDK_INT > 23) {
+            initializePlayer();
         }
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        if ((Util.SDK_INT <= 23 || mPlayer == null)) {
+            initializePlayer();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (Util.SDK_INT <= 23) {
+            releasePlayer();
+        }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        if (Util.SDK_INT > 23) {
+            releasePlayer();
+        }
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        updateResumePosition();
+        outState.putInt(STATE_RESUME_WINDOW, mResumeWindow);
+        outState.putLong(STATE_RESUME_POSITION, mResumePosition);
+    }
 
     // ExoPlayer Event Listener methods
     @Override
@@ -247,7 +335,6 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
         if (playbackState == ExoPlayer.STATE_ENDED) {
-            Log.d(TAG, "playback finished");
             hidePlayPause();
         }
     }

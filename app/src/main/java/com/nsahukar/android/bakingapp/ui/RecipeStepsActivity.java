@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
@@ -37,6 +38,7 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
     private static final String EXTRA_RECIPE_NAME = "extra_recipe_name";
     public static final String EXTRA_STEP_NUMBER_VISIBLE = "extra_step_number_visible";
     private static final String STATE_STEP_NUMBER_VISIBLE = "state_step_number_visible";
+    private static final String STATE_RECYCLER_VIEW = "state_recycler_view";
     private static final int RID_DETAIL_CONTAINER = R.id.detail_container;
 
     private boolean mTwoPane;
@@ -45,6 +47,7 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
     private String mRecipeName;
     private RecipeStepsAdapter mRecipeStepsAdapter;
     private String mIngredientsJsonString;
+    private Parcelable mRecyclerViewSavedInstanceSate;
     @BindView(R.id.toolbar) Toolbar mToolbar;
     @BindView(R.id.rv_recipe_steps) RecyclerView mRecipeStepsRecyclerView;
 
@@ -79,6 +82,10 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
         // set adapter to recycler view
         mRecipeStepsAdapter = new RecipeStepsAdapter(this);
         mRecipeStepsRecyclerView.setAdapter(mRecipeStepsAdapter);
+        if (mRecyclerViewSavedInstanceSate != null) {
+            mRecipeStepsRecyclerView.getLayoutManager().
+                    onRestoreInstanceState(mRecyclerViewSavedInstanceSate);
+        }
     }
 
     // Show ingredients detail activity
@@ -176,6 +183,10 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
             if (savedInstanceState.containsKey(STATE_STEP_NUMBER_VISIBLE)) {
                 mStepNumberVisible = savedInstanceState.getInt(STATE_STEP_NUMBER_VISIBLE);
             }
+            if (savedInstanceState.containsKey(STATE_RECYCLER_VIEW)) {
+                mRecyclerViewSavedInstanceSate = savedInstanceState.
+                        getParcelable(STATE_RECYCLER_VIEW);
+            }
         }
 
         // get bundled extras (if any)
@@ -211,10 +222,13 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
         if (getResources().getBoolean(R.bool.is_tablet)) {
             outState.putInt(STATE_STEP_NUMBER_VISIBLE, mStepNumberVisible);
-            super.onSaveInstanceState(outState);
         }
+        outState.putParcelable(STATE_RECYCLER_VIEW, mRecipeStepsRecyclerView.getLayoutManager().
+                onSaveInstanceState());
+
     }
 
     @Override
@@ -225,6 +239,8 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
                 if (bundle != null) {
                     if (bundle.containsKey(EXTRA_STEP_NUMBER_VISIBLE)) {
                         mStepNumberVisible = bundle.getInt(EXTRA_STEP_NUMBER_VISIBLE);
+                        mRecipeStepsAdapter.setSelectedPosition(
+                                mStepNumberVisible == -1 ? 0 : mStepNumberVisible + 2);
                         if (mStepNumberVisible == -1) {
                             onClickIngredients();
                         } else if (mStepNumberVisible > -1) {

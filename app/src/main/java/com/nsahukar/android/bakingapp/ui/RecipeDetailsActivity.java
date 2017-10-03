@@ -9,6 +9,7 @@ import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.MenuItem;
+import android.view.View;
 
 import com.nsahukar.android.bakingapp.R;
 
@@ -49,6 +50,21 @@ public class RecipeDetailsActivity extends AppCompatActivity
         }
     }
 
+    // Hide the system bars
+    private void hideSystemUI() {
+        View decorView = getWindow().getDecorView();
+        // Set the IMMERSIVE flag.
+        // Set the content to appear under the system bars so that the content
+        // doesn't resize when the system bars hide and show.
+        decorView.setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+        );
+    }
+
     // Show fragment based on step number visible
     // mStepNumberVisible == -1                  -----> IngredientsDetailFragment
     // mStepNumberVisible in [0:mSteps.length-1] -----> StepDetailFragment
@@ -82,8 +98,7 @@ public class RecipeDetailsActivity extends AppCompatActivity
                 getInstance(mIngredientsJsonString);
         getSupportFragmentManager().beginTransaction()
                 .replace(RID_RECIPE_DETAILS_CONTAINER, fragment)
-                .disallowAddToBackStack()
-                .commitAllowingStateLoss();
+                .commit();
     }
 
     // Show step detail fragment
@@ -91,8 +106,7 @@ public class RecipeDetailsActivity extends AppCompatActivity
         StepDetailFragment fragment = StepDetailFragment.getInstance(stepContentValues, finalStep);
         getSupportFragmentManager().beginTransaction()
                 .replace(RID_RECIPE_DETAILS_CONTAINER, fragment)
-                .disallowAddToBackStack()
-                .commitAllowingStateLoss();
+                .commit();
     }
 
     // static methods that return the prepared intent for this activity
@@ -119,13 +133,14 @@ public class RecipeDetailsActivity extends AppCompatActivity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_recipe_details);
+
         if (savedInstanceState != null) {
             if (savedInstanceState.containsKey(STATE_STEP_NUMBER_VISIBLE)) {
                 mStepNumberVisible = savedInstanceState.getInt(STATE_STEP_NUMBER_VISIBLE);
             }
         }
         finishIfTabletLandscape();
-        setContentView(R.layout.activity_recipe_details);
         ButterKnife.bind(this);
 
         // set up action bar
@@ -134,7 +149,14 @@ public class RecipeDetailsActivity extends AppCompatActivity
         }
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(true);
+            if (getResources().getBoolean(R.bool.is_landscape)) {
+                // hide the status bar
+                hideSystemUI();
+                // hide the action bar
+                actionBar.hide();
+            } else {
+                actionBar.setDisplayHomeAsUpEnabled(true);
+            }
         }
 
         // get bundled extras (if any)
@@ -159,8 +181,10 @@ public class RecipeDetailsActivity extends AppCompatActivity
             }
         }
 
-        // show necessary recipe detail fragment
-        showNecessaryRecipeDetailFragment();
+        if (savedInstanceState == null) {
+            // show necessary recipe detail fragment
+            showNecessaryRecipeDetailFragment();
+        }
     }
 
     @Override

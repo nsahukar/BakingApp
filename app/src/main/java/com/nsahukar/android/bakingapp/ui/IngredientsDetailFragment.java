@@ -3,6 +3,7 @@ package com.nsahukar.android.bakingapp.ui;
 import android.content.ContentValues;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
@@ -27,9 +28,11 @@ public class IngredientsDetailFragment extends Fragment {
 
     private static final String TAG = IngredientsDetailFragment.class.getSimpleName();
     private static final String ARG_INGREDIENTS_JSON_STRING = "ingredients_json_string";
+    private static final String STATE_RECYCLER_VIEW = "state_recycler_view";
 
     private String mIngredientsJsonStr;
     private OnFragmentInteractionListener mListener;
+    private Parcelable mRecyclerViewSavedInstanceSate;
     @BindView(R.id.rv_ingredients_detail) RecyclerView mIngredientsRecyclerView;
     @Nullable @BindView(R.id.btn_steps) Button mStepsButton;
 
@@ -56,6 +59,10 @@ public class IngredientsDetailFragment extends Fragment {
             // set adapter to recycler view
             IngredientsAdapter ingredientsAdapter = new IngredientsAdapter(ingredientsValues);
             mIngredientsRecyclerView.setAdapter(ingredientsAdapter);
+            if (mRecyclerViewSavedInstanceSate != null) {
+                mIngredientsRecyclerView.getLayoutManager().
+                        onRestoreInstanceState(mRecyclerViewSavedInstanceSate);
+            }
         }
     }
 
@@ -76,6 +83,14 @@ public class IngredientsDetailFragment extends Fragment {
 
     // lifecycle methods
     @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        if (context instanceof IngredientsDetailFragment.OnFragmentInteractionListener) {
+            mListener = (IngredientsDetailFragment.OnFragmentInteractionListener) context;
+        }
+    }
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
@@ -89,6 +104,15 @@ public class IngredientsDetailFragment extends Fragment {
         // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_ingredients_detail, container, false);
         ButterKnife.bind(this, view);
+
+        if (savedInstanceState != null) {
+            if (savedInstanceState.containsKey(STATE_RECYCLER_VIEW)) {
+                mRecyclerViewSavedInstanceSate = savedInstanceState.
+                        getParcelable(STATE_RECYCLER_VIEW);
+            }
+        }
+
+        // set up recycler view
         setUpRecyclerView();
 
         // For width < 900dp
@@ -108,19 +132,16 @@ public class IngredientsDetailFragment extends Fragment {
     }
 
     @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        if (context instanceof IngredientsDetailFragment.OnFragmentInteractionListener) {
-            mListener = (IngredientsDetailFragment.OnFragmentInteractionListener) context;
-        }
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelable(STATE_RECYCLER_VIEW, mIngredientsRecyclerView.getLayoutManager().
+                onSaveInstanceState());
     }
 
     @Override
     public void onDetach() {
         super.onDetach();
     }
-
-
 
 
     // Fragment interaction listener

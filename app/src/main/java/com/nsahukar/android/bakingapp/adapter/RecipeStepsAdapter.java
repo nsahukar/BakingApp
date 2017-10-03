@@ -48,6 +48,12 @@ public class RecipeStepsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         }
     }
 
+    // set selected position
+    public void setSelectedPosition(int selectedPosition) {
+        mSelectedPosition = selectedPosition;
+        notifyDataSetChanged();
+    }
+
     // Swap ingredients and steps content values
     public void swapContentValues(ContentValues[] steps) {
         mSteps = steps;
