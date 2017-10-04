@@ -98,7 +98,7 @@ public class RecipeDetailsActivityTest {
         Context targetContext = InstrumentationRegistry.getInstrumentation()
                 .getTargetContext();
         return RecipeDetailsActivity.getPreparedIntent(targetContext, TEST_EXTRA_RECIPE_NAME,
-                TEST_EXTRA_INGREDIENTS_JSON, steps, stepNumber);
+                TEST_EXTRA_INGREDIENTS_JSON, steps, stepNumber, 0, 0);
     }
 
     private void forwardNavigateFromStep(int stepNumber) {
