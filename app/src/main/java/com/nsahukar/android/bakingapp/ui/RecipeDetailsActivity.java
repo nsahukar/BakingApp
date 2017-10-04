@@ -11,6 +11,7 @@ import android.support.v7.widget.Toolbar;
 import android.view.MenuItem;
 import android.view.View;
 
+import com.google.android.exoplayer2.C;
 import com.nsahukar.android.bakingapp.R;
 
 import java.util.Arrays;
@@ -25,18 +26,23 @@ public class RecipeDetailsActivity extends AppCompatActivity
         StepDetailFragment.OnFragmentInteractionListener {
 
     private static final String TAG = RecipeDetailsActivity.class.getSimpleName();
-    private static final String ARG_RECIPE_NAME = "recipe_name";
-    private static final String ARG_INGREDIENTS_JSON_STRING = "ingredients_json_string";
-    private static final String ARG_STEPS_CONTENT_VALUES = "steps_values";
-    private static final String ARG_STEP_NUMBER = "step_number";
+    private static final String EXTRA_RECIPE_NAME = "extra_recipe_name";
+    private static final String EXTRA_INGREDIENTS_JSON_STRING = "extra_ingredients_json_string";
+    private static final String EXTRA_STEPS_CONTENT_VALUES = "extra_steps_values";
+    private static final String EXTRA_STEP_NUMBER = "extra_step_number";
+    private static final String EXTRA_RESUME_WINDOW = "extra_resume_window";
+    private static final String EXTRA_RESUME_POSITION = "extra_resume_position";
     private static final String STATE_STEP_NUMBER_VISIBLE = "state_step_number_visible";
+    private static final String STATE_RESUME_WINDOW = "state_resume_window";
+    private static final String STATE_RESUME_POSITION = "state_resume_position";
     private static final int RID_RECIPE_DETAILS_CONTAINER = R.id.recipe_details_container;
 
     private String mIngredientsJsonString;
     private ContentValues[] mSteps;
     private int mStepNumberVisible = -1;
-    @BindView(R.id.toolbar)
-    Toolbar mToolbar;
+    private int mResumeWindow;
+    private long mResumePosition;
+    @BindView(R.id.toolbar) Toolbar mToolbar;
 
 
     // Finish this activity if orientation landscape in a tablet
@@ -44,6 +50,8 @@ public class RecipeDetailsActivity extends AppCompatActivity
         if (getResources().getBoolean(R.bool.is_tablet_landscape)) {
             Intent intent = getIntent();
             intent.putExtra(RecipeStepsActivity.EXTRA_STEP_NUMBER_VISIBLE, mStepNumberVisible);
+            intent.putExtra(RecipeStepsActivity.EXTRA_RESUME_WINDOW, mResumeWindow);
+            intent.putExtra(RecipeStepsActivity.EXTRA_RESUME_POSITION, mResumePosition);
             setResult(getResources().getInteger(R.integer.result_code_show_recipe_details_landscape),
                     intent);
             navigateUpFromSameTask(this);
@@ -80,6 +88,12 @@ public class RecipeDetailsActivity extends AppCompatActivity
         }
     }
 
+    // clear resume position
+    private void clearResumePosition() {
+        mResumeWindow = C.INDEX_UNSET;
+        mResumePosition = C.TIME_UNSET;
+    }
+
     // Show next recipe detail
     private void showNextRecipeDetail() {
         mStepNumberVisible += 1;
@@ -103,7 +117,9 @@ public class RecipeDetailsActivity extends AppCompatActivity
 
     // Show step detail fragment
     private void showStepDetailFragment(ContentValues stepContentValues, boolean finalStep) {
-        StepDetailFragment fragment = StepDetailFragment.getInstance(stepContentValues, finalStep);
+        StepDetailFragment fragment = StepDetailFragment.getInstance(stepContentValues,
+                finalStep, mResumeWindow, mResumePosition);
+        clearResumePosition();
         getSupportFragmentManager().beginTransaction()
                 .replace(RID_RECIPE_DETAILS_CONTAINER, fragment)
                 .commit();
@@ -113,19 +129,32 @@ public class RecipeDetailsActivity extends AppCompatActivity
     public static Intent getPreparedIntent(Context context, String recipeName,
                                            String ingredientsJsonString,
                                            ContentValues[] steps) {
-        return getPreparedIntent(context, recipeName, ingredientsJsonString, steps, -1);
+        return getPreparedIntent(context, recipeName, ingredientsJsonString, steps, -1,
+                C.INDEX_UNSET, C.TIME_UNSET);
     }
 
     public static Intent getPreparedIntent(Context context, String recipeName,
                                            String ingredientsJsonString,
                                            ContentValues[] steps,
-                                           int stepNumber) {
+                                           int stepNumber,
+                                           int playerResumeWindow,
+                                           long playerResumePosition) {
         Intent intent = new Intent(context, RecipeDetailsActivity.class);
-        intent.putExtra(ARG_RECIPE_NAME, recipeName);
-        intent.putExtra(ARG_INGREDIENTS_JSON_STRING, ingredientsJsonString);
-        intent.putExtra(ARG_STEPS_CONTENT_VALUES, steps);
-        intent.putExtra(ARG_STEP_NUMBER, stepNumber);
+        intent.putExtra(EXTRA_RECIPE_NAME, recipeName);
+        intent.putExtra(EXTRA_INGREDIENTS_JSON_STRING, ingredientsJsonString);
+        intent.putExtra(EXTRA_STEPS_CONTENT_VALUES, steps);
+        intent.putExtra(EXTRA_STEP_NUMBER, stepNumber);
+        intent.putExtra(EXTRA_RESUME_WINDOW, playerResumeWindow);
+        intent.putExtra(EXTRA_RESUME_POSITION, playerResumePosition);
         return intent;
+    }
+
+    // Update resume window and position of ExoPlayer
+    public void updateExoPlayerResumeWindowAndPosition(int resumeWindow, long resumePosition) {
+        if (getResources().getBoolean(R.bool.is_tablet)) {
+            mResumeWindow = resumeWindow;
+            mResumePosition = resumePosition;
+        }
     }
 
 
@@ -138,6 +167,12 @@ public class RecipeDetailsActivity extends AppCompatActivity
         if (savedInstanceState != null) {
             if (savedInstanceState.containsKey(STATE_STEP_NUMBER_VISIBLE)) {
                 mStepNumberVisible = savedInstanceState.getInt(STATE_STEP_NUMBER_VISIBLE);
+            }
+            if (savedInstanceState.containsKey(STATE_RESUME_WINDOW)) {
+                mResumeWindow = savedInstanceState.getInt(STATE_RESUME_WINDOW);
+            }
+            if (savedInstanceState.containsKey(STATE_RESUME_POSITION)) {
+                mResumePosition = savedInstanceState.getLong(STATE_RESUME_POSITION);
             }
         }
         finishIfTabletLandscape();
@@ -162,22 +197,28 @@ public class RecipeDetailsActivity extends AppCompatActivity
         // get bundled extras (if any)
         Bundle bundle = getIntent().getExtras();
         if (bundle != null) {
-            if (bundle.containsKey(ARG_RECIPE_NAME)) {
+            if (bundle.containsKey(EXTRA_RECIPE_NAME)) {
                 if (actionBar != null) {
-                    actionBar.setTitle(bundle.getString(ARG_RECIPE_NAME));
+                    actionBar.setTitle(bundle.getString(EXTRA_RECIPE_NAME));
                 }
             }
-            if (bundle.containsKey(ARG_INGREDIENTS_JSON_STRING)) {
-                mIngredientsJsonString = bundle.getString(ARG_INGREDIENTS_JSON_STRING);
+            if (bundle.containsKey(EXTRA_INGREDIENTS_JSON_STRING)) {
+                mIngredientsJsonString = bundle.getString(EXTRA_INGREDIENTS_JSON_STRING);
             }
-            if (bundle.containsKey(ARG_STEPS_CONTENT_VALUES)) {
-                Parcelable[] parcelableSteps = bundle.getParcelableArray(ARG_STEPS_CONTENT_VALUES);
+            if (bundle.containsKey(EXTRA_STEPS_CONTENT_VALUES)) {
+                Parcelable[] parcelableSteps = bundle.getParcelableArray(EXTRA_STEPS_CONTENT_VALUES);
                 if (parcelableSteps != null) {
                     mSteps = Arrays.copyOf(parcelableSteps, parcelableSteps.length, ContentValues[].class);
                 }
             }
-            if (savedInstanceState == null && bundle.containsKey(ARG_STEP_NUMBER)) {
-                mStepNumberVisible = bundle.getInt(ARG_STEP_NUMBER, -1);
+            if (savedInstanceState == null && bundle.containsKey(EXTRA_STEP_NUMBER)) {
+                mStepNumberVisible = bundle.getInt(EXTRA_STEP_NUMBER, -1);
+            }
+            if (savedInstanceState == null && bundle.containsKey(EXTRA_RESUME_WINDOW)) {
+                mResumeWindow = bundle.getInt(EXTRA_RESUME_WINDOW);
+            }
+            if (savedInstanceState == null && bundle.containsKey(EXTRA_RESUME_POSITION)) {
+                mResumePosition = bundle.getLong(EXTRA_RESUME_POSITION);
             }
         }
 
@@ -206,8 +247,10 @@ public class RecipeDetailsActivity extends AppCompatActivity
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        outState.putInt(STATE_STEP_NUMBER_VISIBLE, mStepNumberVisible);
         super.onSaveInstanceState(outState);
+        outState.putInt(STATE_STEP_NUMBER_VISIBLE, mStepNumberVisible);
+        outState.putInt(STATE_RESUME_WINDOW, mResumeWindow);
+        outState.putLong(STATE_RESUME_POSITION, mResumePosition);
     }
 
 

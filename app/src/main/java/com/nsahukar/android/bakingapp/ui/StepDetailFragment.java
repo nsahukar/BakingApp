@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -54,6 +55,8 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
     private static final String TAG = StepDetailFragment.class.getSimpleName();
     private static final String ARG_STEP_CONTENT_VALUES = "arg_step_values";
     private static final String ARG_FINAL_STEP = "arg_final_step";
+    private static final String ARG_RESUME_WINDOW = "arg_resume_window";
+    private static final String ARG_RESUME_POSITION = "arg_resume_position";
     private static final String STATE_RESUME_WINDOW = "state_resume_window";
     private static final String STATE_RESUME_POSITION = "state_resume_position";
     private static final long CACHE_MAX_SIZE = 1024 * 1024 * 100;
@@ -87,7 +90,7 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
             mPlayerView.setPlayer(mPlayer);
 
             // set video thumbnail (if present)
-            if (mRecipeStepVideoThumbnailUrl != null && mRecipeStepVideoThumbnailUrl.length() > 0) {
+            if (!TextUtils.isEmpty(mRecipeStepVideoThumbnailUrl)) {
                 ImageView videoThumbnailImageView = mPlayerView.findViewById(R.id.exo_artwork);
                 Picasso.with(getActivity()).load(mRecipeStepVideoThumbnailUrl).
                         into(videoThumbnailImageView);
@@ -121,6 +124,7 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
             boolean haveResumePosition = mResumeWindow != C.INDEX_UNSET;
             if (haveResumePosition) {
                 mPlayer.seekTo(mResumeWindow, mResumePosition);
+                clearResumePosition();
             }
             mPlayer.prepare(mediaSource, !haveResumePosition, false);
         } else {
@@ -128,6 +132,7 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
         }
     }
 
+    // release player
     private void releasePlayer() {
         if (mPlayer != null) {
             mPlayer.stop();
@@ -136,6 +141,7 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
         }
     }
 
+    // update player resume position
     private void updateResumePosition() {
         if (mPlayer != null) {
             mResumeWindow = mPlayer.getCurrentWindowIndex();
@@ -143,6 +149,17 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
         }
     }
 
+    private void updateActivityResumePosition() {
+        if (getActivity() instanceof RecipeStepsActivity) {
+            RecipeStepsActivity activity = (RecipeStepsActivity) getActivity();
+            activity.updateExoPlayerResumeWindowAndPosition(mResumeWindow, mResumePosition);
+        } else if (getActivity() instanceof RecipeDetailsActivity) {
+            RecipeDetailsActivity activity = (RecipeDetailsActivity) getActivity();
+            activity.updateExoPlayerResumeWindowAndPosition(mResumeWindow, mResumePosition);
+        }
+    }
+
+    // clear resume position
     private void clearResumePosition() {
         mResumeWindow = C.INDEX_UNSET;
         mResumePosition = C.TIME_UNSET;
@@ -172,14 +189,19 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
 
     // Static method to get the new fragment instance
     public static StepDetailFragment getInstance(ContentValues stepContentValues,
-                                                 boolean finalStep) {
+                                                 boolean finalStep,
+                                                 int resumeWindow,
+                                                 long resumePosition) {
         StepDetailFragment fragment = new StepDetailFragment();
         Bundle args = new Bundle();
         args.putParcelable(ARG_STEP_CONTENT_VALUES, stepContentValues);
         args.putBoolean(ARG_FINAL_STEP, finalStep);
+        args.putInt(ARG_RESUME_WINDOW, resumeWindow);
+        args.putLong(ARG_RESUME_POSITION, resumePosition);
         fragment.setArguments(args);
         return fragment;
     }
+
 
     // lifecycle methods
     @Override
@@ -196,6 +218,8 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
         if (getArguments() != null) {
             mStepContentValues = getArguments().getParcelable(ARG_STEP_CONTENT_VALUES);
             mFinalStep = getArguments().getBoolean(ARG_FINAL_STEP, false);
+            mResumeWindow = getArguments().getInt(ARG_RESUME_WINDOW);
+            mResumePosition = getArguments().getLong(ARG_RESUME_POSITION);
         }
     }
 
@@ -209,7 +233,7 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
         Step step = new Step(mStepContentValues);
         // recipe step video url
         final String videoUrlString = step.getVideoUrl();
-        if (videoUrlString != null && videoUrlString.length() > 0) {
+        if (!TextUtils.isEmpty(videoUrlString)) {
             mRecipeStepVideoUri = Uri.parse(videoUrlString);
         }
 
@@ -265,7 +289,6 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
     @Override
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        clearResumePosition();
         if (savedInstanceState != null) {
             if (savedInstanceState.containsKey(STATE_RESUME_WINDOW)) {
                 mResumeWindow = savedInstanceState.getInt(STATE_RESUME_WINDOW);
@@ -295,6 +318,7 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
     @Override
     public void onPause() {
         super.onPause();
+        updateResumePosition();
         if (Util.SDK_INT <= 23) {
             releasePlayer();
         }
@@ -311,7 +335,7 @@ public class StepDetailFragment extends Fragment implements ExoPlayer.EventListe
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        updateResumePosition();
+        updateActivityResumePosition();
         outState.putInt(STATE_RESUME_WINDOW, mResumeWindow);
         outState.putLong(STATE_RESUME_POSITION, mResumePosition);
     }

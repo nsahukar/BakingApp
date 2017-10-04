@@ -3,6 +3,7 @@ package com.nsahukar.android.bakingapp.adapter;
 import android.content.Context;
 import android.database.Cursor;
 import android.support.v7.widget.RecyclerView;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -49,7 +50,7 @@ public class RecipesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
     }
 
-    // swap cursor
+    // Swap cursor
     public void swapCursor(Cursor cursor) {
         mCursor = cursor;
         notifyDataSetChanged();
@@ -86,10 +87,12 @@ public class RecipesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         final int viewType = getItemViewType(position);
         if (viewType == VIEW_TYPE_GRID) {
             RecipeGridViewHolder recipeGridViewHolder = (RecipeGridViewHolder) holder;
+            // recipe image (show if available)
             final String recipeImageUrl = mCursor.getString(mCursor.getColumnIndex(RecipesEntry.COLUMN_IMAGE));
-            if (recipeImageUrl != null && recipeImageUrl.length() > 0) {
+            if (!TextUtils.isEmpty(recipeImageUrl)) {
                 Picasso.with(mContext).load(recipeImageUrl).into(recipeGridViewHolder.recipeImageView);
             }
+            // recipe name
             final String recipeName = mCursor.getString(mCursor.getColumnIndex(RecipesEntry.COLUMN_NAME));
             recipeGridViewHolder.recipeNameTextView.setText(recipeName);
         } else {

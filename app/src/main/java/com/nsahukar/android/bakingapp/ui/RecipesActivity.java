@@ -5,8 +5,8 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.Parcelable;
-import android.os.PersistableBundle;
 import android.support.annotation.DimenRes;
 import android.support.annotation.NonNull;
 import android.support.constraint.ConstraintLayout;
@@ -14,7 +14,6 @@ import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
@@ -26,6 +25,7 @@ import com.nsahukar.android.bakingapp.R;
 import com.nsahukar.android.bakingapp.adapter.RecipesAdapter;
 import com.nsahukar.android.bakingapp.data.BakingAppContract.RecipesEntry;
 import com.nsahukar.android.bakingapp.sync.BakingAppSyncUtils;
+import com.nsahukar.android.bakingapp.utils.BakingAppNetworkUtils;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -34,6 +34,7 @@ import butterknife.OnClick;
 public class RecipesActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>,
         RecipesAdapter.OnItemClickListener {
 
+    private static final String TAG = RecipesActivity.class.getSimpleName();
     private static final String STATE_RECYCLER_VIEW = "state_recycler_view";
 
     @BindView(R.id.toolbar) Toolbar mToolbar;
@@ -106,6 +107,21 @@ public class RecipesActivity extends AppCompatActivity implements LoaderManager.
         mRecipesRecyclerView.setVisibility(RecyclerView.VISIBLE);
     }
 
+    // load data for the view
+    private void loadData(boolean retry) {
+        showLoaderIndicator();
+        if (!retry) {
+            getSupportLoaderManager().initLoader(R.integer.id_recipes_loader, null, this);
+        } else {
+            getSupportLoaderManager().restartLoader(R.integer.id_recipes_loader, null, this);
+        }
+        if (BakingAppNetworkUtils.isActiveNetworkAvailable(this)) {
+            BakingAppSyncUtils.initialize(this);
+        } else {
+            showErrorMessage(getString(R.string.err_no_internet_connection));
+        }
+    }
+
 
     // Lifecycle methods
     @Override
@@ -125,9 +141,7 @@ public class RecipesActivity extends AppCompatActivity implements LoaderManager.
             }
         }
         setUpRecyclerView();
-        showLoaderIndicator();
-        getSupportLoaderManager().initLoader(R.integer.id_recipes_loader, null, this);
-        BakingAppSyncUtils.initialize(this);
+        loadData(false);
     }
 
     @Override
@@ -139,7 +153,7 @@ public class RecipesActivity extends AppCompatActivity implements LoaderManager.
 
     @OnClick(R.id.btn_retry)
     void retry() {
-        getSupportLoaderManager().restartLoader(R.integer.id_recipes_loader, null, this);
+        loadData(true);
     }
 
 
@@ -167,7 +181,7 @@ public class RecipesActivity extends AppCompatActivity implements LoaderManager.
 
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
-        if (data != null) {
+        if (data != null && data.getCount() > 0) {
             // show recipes grid view
             showRecipesGridView();
             // swap the cursor of the recipe adapter

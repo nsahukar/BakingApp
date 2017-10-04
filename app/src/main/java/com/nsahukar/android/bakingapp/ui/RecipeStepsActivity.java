@@ -18,6 +18,7 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.MenuItem;
 
+import com.google.android.exoplayer2.C;
 import com.nsahukar.android.bakingapp.R;
 import com.nsahukar.android.bakingapp.adapter.RecipeStepsAdapter;
 import com.nsahukar.android.bakingapp.data.BakingAppContract.RecipesEntry;
@@ -34,11 +35,18 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
         RecipeStepsAdapter.OnItemClickListener {
 
     private static final String TAG = RecipeStepsActivity.class.getSimpleName();
+
     private static final String EXTRA_RECIPE_ID = "extra_recipe_id";
     private static final String EXTRA_RECIPE_NAME = "extra_recipe_name";
     public static final String EXTRA_STEP_NUMBER_VISIBLE = "extra_step_number_visible";
-    private static final String STATE_STEP_NUMBER_VISIBLE = "state_step_number_visible";
+    public static final String EXTRA_RESUME_WINDOW = "extra_resume_window";
+    public static final String EXTRA_RESUME_POSITION = "extra_resume_position";
+
     private static final String STATE_RECYCLER_VIEW = "state_recycler_view";
+    private static final String STATE_STEP_NUMBER_VISIBLE = "state_step_number_visible";
+    private static final String STATE_RESUME_WINDOW = "state_resume_window";
+    private static final String STATE_RESUME_POSITION = "state_resume_position";
+
     private static final int RID_DETAIL_CONTAINER = R.id.detail_container;
 
     private boolean mTwoPane;
@@ -48,6 +56,8 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
     private RecipeStepsAdapter mRecipeStepsAdapter;
     private String mIngredientsJsonString;
     private Parcelable mRecyclerViewSavedInstanceSate;
+    private int mResumeWindow;
+    private long mResumePosition;
     @BindView(R.id.toolbar) Toolbar mToolbar;
     @BindView(R.id.rv_recipe_steps) RecyclerView mRecipeStepsRecyclerView;
 
@@ -69,7 +79,9 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
     private void setRecipeName(String recipeName) {
         if (recipeName != null && mToolbar != null) {
             mRecipeName = recipeName;
-            getSupportActionBar().setTitle(recipeName);
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setTitle(recipeName);
+            }
         }
     }
 
@@ -86,6 +98,12 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
             mRecipeStepsRecyclerView.getLayoutManager().
                     onRestoreInstanceState(mRecyclerViewSavedInstanceSate);
         }
+    }
+
+    // clear resume position
+    private void clearResumePosition() {
+        mResumeWindow = C.INDEX_UNSET;
+        mResumePosition = C.TIME_UNSET;
     }
 
     // Show ingredients detail activity
@@ -115,8 +133,11 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
                         mRecipeName,
                         mIngredientsJsonString,
                         mRecipeStepsAdapter.getSteps(),
-                        stepPosition
+                        stepPosition,
+                        mResumeWindow,
+                        mResumePosition
                 );
+        clearResumePosition();
         if (getResources().getBoolean(R.bool.is_tablet)) {
             int requestCode = getResources().
                     getInteger(R.integer.request_code_show_recipe_details_portrait);
@@ -138,7 +159,9 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
 
     // Show step detail fragment
     private void showStepDetailFragment(ContentValues stepContentValues, boolean finalStep) {
-        StepDetailFragment fragment = StepDetailFragment.getInstance(stepContentValues, finalStep);
+        StepDetailFragment fragment = StepDetailFragment.getInstance(stepContentValues,
+                finalStep, mResumeWindow, mResumePosition);
+        clearResumePosition();
         getSupportFragmentManager().beginTransaction()
                 .replace(RID_DETAIL_CONTAINER, fragment)
                 .commitAllowingStateLoss();
@@ -151,6 +174,14 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
         intent.putExtra(EXTRA_RECIPE_ID, recipeId);
         intent.putExtra(EXTRA_RECIPE_NAME, recipeName);
         return intent;
+    }
+
+    // Update resume window and position of ExoPlayer
+    public void updateExoPlayerResumeWindowAndPosition(int resumeWindow, long resumePosition) {
+        if (getResources().getBoolean(R.bool.is_tablet)) {
+            mResumeWindow = resumeWindow;
+            mResumePosition = resumePosition;
+        }
     }
 
 
@@ -186,6 +217,12 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
             if (savedInstanceState.containsKey(STATE_RECYCLER_VIEW)) {
                 mRecyclerViewSavedInstanceSate = savedInstanceState.
                         getParcelable(STATE_RECYCLER_VIEW);
+            }
+            if (savedInstanceState.containsKey(STATE_RESUME_WINDOW)) {
+                mResumeWindow = savedInstanceState.getInt(STATE_RESUME_WINDOW);
+            }
+            if (savedInstanceState.containsKey(STATE_RESUME_POSITION)) {
+                mResumePosition = savedInstanceState.getLong(STATE_RESUME_POSITION);
             }
         }
 
@@ -223,12 +260,13 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        if (getResources().getBoolean(R.bool.is_tablet)) {
-            outState.putInt(STATE_STEP_NUMBER_VISIBLE, mStepNumberVisible);
-        }
         outState.putParcelable(STATE_RECYCLER_VIEW, mRecipeStepsRecyclerView.getLayoutManager().
                 onSaveInstanceState());
-
+        if (getResources().getBoolean(R.bool.is_tablet)) {
+            outState.putInt(STATE_STEP_NUMBER_VISIBLE, mStepNumberVisible);
+            outState.putInt(STATE_RESUME_WINDOW, mResumeWindow);
+            outState.putLong(STATE_RESUME_POSITION, mResumePosition);
+        }
     }
 
     @Override
@@ -239,6 +277,9 @@ public class RecipeStepsActivity extends AppCompatActivity implements LoaderMana
                 if (bundle != null) {
                     if (bundle.containsKey(EXTRA_STEP_NUMBER_VISIBLE)) {
                         mStepNumberVisible = bundle.getInt(EXTRA_STEP_NUMBER_VISIBLE);
+                        mResumeWindow = bundle.getInt(EXTRA_RESUME_WINDOW);
+                        mResumePosition = bundle.getLong(EXTRA_RESUME_POSITION);
+
                         mRecipeStepsAdapter.setSelectedPosition(
                                 mStepNumberVisible == -1 ? 0 : mStepNumberVisible + 2);
                         if (mStepNumberVisible == -1) {

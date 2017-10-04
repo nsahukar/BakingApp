@@ -23,4 +23,7 @@
 
     <!-- Ingredients App Widget -->
     <string name="title_ingredients_app_widget_config_activity">Select Recipe</string>
+
+    <!-- Error Messages -->
+    <string name="err_no_internet_connection">No Internet connection. Make sure that Wi-Fi or cellular mobile data is turned on, then try again.</string>
 </resources>
